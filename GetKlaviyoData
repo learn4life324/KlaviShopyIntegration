@@ -1,1 +1,73 @@
-hello.txt
+const fetch = require('node-fetch');
+const url = 'https://a9acc88bb9f836c23a6cb21e2b990964:c881e7f35a87ddd10d6aabe57c0ca2e6@success-engineering.myshopify.com/admin/products.json';
+const OrderURL = 'https://a9acc88bb9f836c23a6cb21e2b990964:c881e7f35a87ddd10d6aabe57c0ca2e6@success-engineering.myshopify.com//admin/api/2020-10/orders.json?status=any';
+
+function checkResponseStatus(res) {
+    if(res.ok){
+        return res
+    } else {
+        throw new Error(`The HTTP status of the reponse: ${res.status} (${res.statusText})`);
+    }
+}
+
+fetch(OrderURL)
+    .then(checkResponseStatus)
+    .then(res => res.json())
+    .then(data => {
+        var results =[];
+        for (var i = 0; i < data.orders.length; i++) {
+            results.push({
+            "token": "WZEJ6G", 
+            "event" : "Placed Order",
+            "customer_properties" : {"$email": data.orders[i].customer.email,
+            "$first_name": data.orders[i].customer.first_name,
+            "$last_name": data.orders[i].customer.last_name,
+            "$phone_number": data.orders[i].customer.phone,
+            "$address1": "123 Abc st",
+            "$address2": "Suite 1",
+            "$city": "Boston",
+            "$zip": "02110",
+            "$region": "MA",
+            "$country": "USA"
+            },
+
+            "properties": {
+                "$event_id": data.orders[i].id,
+                "$value": data.orders[i].total_price,
+                "Categories": ["Fiction", "Classics", "Children"],
+                "ItemNames": ["Winnie the Pooh", "A Tale of Two Cities"],
+                "Brands": ["Kids Books", "Harcourt Classics"],
+                "DiscountCode": "Free Shipping",
+                "DiscountValue": 5,
+                "Items": [{
+                    "ProductID": "1111",
+                    "SKU": "WINNIEPOOH",
+                    "ProductName": "Winnie the Pooh",
+                    "Quantity": 1,
+                    "ItemPrice": 9.99,
+                    "RowTotal": 9.99,
+                    "ProductURL": "http://www.example.com/path/to/product",
+                    "ImageURL": "http://www.example.com/path/to/product/image.png",
+                    "Categories": ["Fiction", "Children"],
+                    "Brand": "Kids Books"
+                  }]
+                }
+                });
+
+            //"userID": { "id": data.orders[i].id, 
+              //          "email": data.orders[i].email }
+        }
+        console.log("Object we created based on the results:");
+        console.log( results )  
+        var arrayToString = JSON.stringify(Object.assign({}, results));  // convert array to string
+       // console.log( JSON.stringify(arrayToString) )        
+
+        var stringToJsonObject = JSON.parse(arrayToString); 
+       // console.log( JSON.stringify(stringToJsonObject) )        
+
+       // console.log(results);
+
+    })
+   // .then(json => console.log(json))
+    .catch(err => console.log(err));
+
