@@ -1,73 +1,107 @@
 const fetch = require('node-fetch');
-const url = 'https://a9acc88bb9f836c23a6cb21e2b990964:c881e7f35a87ddd10d6aabe57c0ca2e6@success-engineering.myshopify.com/admin/products.json';
-const OrderURL = 'https://a9acc88bb9f836c23a6cb21e2b990964:c881e7f35a87ddd10d6aabe57c0ca2e6@success-engineering.myshopify.com//admin/api/2020-10/orders.json?status=any';
 
+const min30 = (30 * 60000);
+//const days30 = (60 * 60000 *24 *30);  // last 30 days
+
+const created_at_min = new Date(new Date().getTime() - min30);
+const created_at_max = new Date();
+
+const APIKey = 'a9acc88bb9f836c23a6cb21e2b990964';
+const accessPWD = 'c881e7f35a87ddd10d6aabe57c0ca2e6';
+const pubApiKey = "WZEJ6G";
+
+const getMonthYear = created_at_max.getFullYear()+"-"+created_at_max.getMonth();
+const urlForAllOrders = "https://"+APIKey+":"+accessPWD+"@success-engineering.myshopify.com/admin/api/"
+                        +getMonthYear+"/orders.json?status=any";
+const urlForLast30MinsOrders = "https://"+APIKey+":"+accessPWD+"@success-engineering.myshopify.com/admin/api/"
+                        +getMonthYear+"/orders.json?status=any&created_at_min="+created_at_min.toISOString()
+                        +"&created_at_max="+created_at_max.toISOString();
+console.log(urlForLast30MinsOrders); 
+
+// UNCOMMENT this part to schedule this call after every 30 mins
+//setInterval( function() { callAPIs(urlForAllOrders) }, 60 * 30000);
+
+callAPIs(urlForAllOrders); //call api for all orders irrespective of time date contraints
+
+//Fetch orders from last 30 mins
+//callAPIs(urlForLast30MinsOrders); //call api for all orders from the last 30 mins
+
+//Call Shopify API and send the results to Klavio using API fetch
+ function callAPIs(OrderURL){
+    fetch(OrderURL)
+        .then(checkResponseStatus)
+        .then(res => res.json())
+        .then(data => { // build your payload here with data from shopify API JSON object
+            for (let i = 0; i < data.orders.length; i++) {
+                let placedOrderMetrics ={ 
+                    "token": pubApiKey, 
+                    "event" : "Placed Order",
+                    "customer_properties" : {
+                        "$email": data.orders[i].customer.email,
+                        "$first_name": data.orders[i].customer.first_name,
+                        "$last_name": data.orders[i].customer.last_name,
+                        "$phone_number": data.orders[i].customer.phone
+                        },
+                    "properties": {
+                        "$event_id": data.orders[i].id,
+                        "$value": data.orders[i].total_price,
+                        },
+                    "time" : Math.round((new Date()).getTime() / 1000)
+            }
+
+            // send your payload to Klaviyo and receive a promise to sync further calls
+            let returnPromise = sendDataToKlaviyo(placedOrderMetrics);
+            returnPromise.then(console.log("Placed order First"));
+                // continue with ordered products to build second payload for line_items
+                for(let j = 0; j < data.orders[i].line_items.length; j++){
+                  let orderProductMetrics = {
+                    "token": pubApiKey,
+                    "event": "Ordered Product",
+                    "customer_properties": {
+                        "$email": data.orders[i].customer.email,
+                        "$first_name": data.orders[i].customer.first_name,
+                        "$last_name": data.orders[i].customer.last_name
+                    },
+                    "properties": {
+                        "$event_id": data.orders[i].line_items[j].id,
+                        "$value": data.orders[i].line_items[j].price,
+                        "ProductID": data.orders[i].line_items[j].product_id,
+                        "SKU": data.orders[i].line_items[j].sku,
+                        "ProductName": data.orders[i].line_items[j].name,
+                        "Quantity": data.orders[i].line_items[j].quantity,
+                        "ProductBrand": data.orders[i].line_items[j].title
+                    },
+                    "time": Math.round((new Date()).getTime() / 1000)         
+                };
+                // send data to Klaviyo with the order Product metrics
+                sendDataToKlaviyo(orderProductMetrics);
+                console.log("Ordered Product sent");
+                }
+            
+            }
+            console.log("Objects we created based on the results:");
+        
+        })
+        .catch(err => console.log(err));
+}
+//encode the data in base64 and send it over to Klaviyo 
+let sendDataToKlaviyo =  function(data){
+        const encodedData = Buffer.from(JSON.stringify(data), 'binary').toString('base64');
+        const url = "https://a.klaviyo.com/api/track?api_key=pk_85d0a1bb1bca774e057f32c4222c4bfc2f&data="+encodedData
+        
+        return fetch(url)
+            .then(checkResponseStatus)
+            .then(res => res.json())
+            .then(data => {
+                console.log(data);
+            })
+            .catch(err => console.log(err));
+    }
+// check response status and send back graceful message
 function checkResponseStatus(res) {
     if(res.ok){
         return res
     } else {
-        throw new Error(`The HTTP status of the reponse: ${res.status} (${res.statusText})`);
+        throw new Error(`The HTTP status of the response: ${res.status} (${res.statusText})`);
     }
 }
-
-fetch(OrderURL)
-    .then(checkResponseStatus)
-    .then(res => res.json())
-    .then(data => {
-        var results =[];
-        for (var i = 0; i < data.orders.length; i++) {
-            results.push({
-            "token": "WZEJ6G", 
-            "event" : "Placed Order",
-            "customer_properties" : {"$email": data.orders[i].customer.email,
-            "$first_name": data.orders[i].customer.first_name,
-            "$last_name": data.orders[i].customer.last_name,
-            "$phone_number": data.orders[i].customer.phone,
-            "$address1": "123 Abc st",
-            "$address2": "Suite 1",
-            "$city": "Boston",
-            "$zip": "02110",
-            "$region": "MA",
-            "$country": "USA"
-            },
-
-            "properties": {
-                "$event_id": data.orders[i].id,
-                "$value": data.orders[i].total_price,
-                "Categories": ["Fiction", "Classics", "Children"],
-                "ItemNames": ["Winnie the Pooh", "A Tale of Two Cities"],
-                "Brands": ["Kids Books", "Harcourt Classics"],
-                "DiscountCode": "Free Shipping",
-                "DiscountValue": 5,
-                "Items": [{
-                    "ProductID": "1111",
-                    "SKU": "WINNIEPOOH",
-                    "ProductName": "Winnie the Pooh",
-                    "Quantity": 1,
-                    "ItemPrice": 9.99,
-                    "RowTotal": 9.99,
-                    "ProductURL": "http://www.example.com/path/to/product",
-                    "ImageURL": "http://www.example.com/path/to/product/image.png",
-                    "Categories": ["Fiction", "Children"],
-                    "Brand": "Kids Books"
-                  }]
-                }
-                });
-
-            //"userID": { "id": data.orders[i].id, 
-              //          "email": data.orders[i].email }
-        }
-        console.log("Object we created based on the results:");
-        console.log( results )  
-        var arrayToString = JSON.stringify(Object.assign({}, results));  // convert array to string
-       // console.log( JSON.stringify(arrayToString) )        
-
-        var stringToJsonObject = JSON.parse(arrayToString); 
-       // console.log( JSON.stringify(stringToJsonObject) )        
-
-       // console.log(results);
-
-    })
-   // .then(json => console.log(json))
-    .catch(err => console.log(err));
-
