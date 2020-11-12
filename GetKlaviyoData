@@ -1,12 +1,10 @@
 const fetch = require('node-fetch');
 
 const min30 = (30 * 60000);
-//const days30 = (60 * 60000 *24 *30);  // last 30 days
-
 const created_at_min = new Date(new Date().getTime() - min30);
 const created_at_max = new Date();
 
-const APIKey = 'a9acc88bb9f836c23a6cb21e2b990964';
+const APIKey = 'a9acc88bb9f836c23a6cb21e2b990964';// exposing key is dangerous, can be hidden if added on server side in rest
 const accessPWD = 'c881e7f35a87ddd10d6aabe57c0ca2e6';
 const pubApiKey = "WZEJ6G";
 
@@ -19,15 +17,12 @@ const urlForLast30MinsOrders = "https://"+APIKey+":"+accessPWD+"@success-enginee
 console.log(urlForLast30MinsOrders); 
 
 // UNCOMMENT this part to schedule this call after every 30 mins
-//setInterval( function() { callAPIs(urlForAllOrders) }, 60 * 30000);
-
-callAPIs(urlForAllOrders); //call api for all orders irrespective of time date contraints
-
-//Fetch orders from last 30 mins
-//callAPIs(urlForLast30MinsOrders); //call api for all orders from the last 30 mins
+//setInterval(() => { apiFunctionCall(urlForAllOrders) }, 60 * 30000);
+//apiFunctionCall(urlForLast30MinsOrders); // api call to fetch all orders from the last 30 mins
+apiFunctionCall(urlForAllOrders); // api call for all orders irrespective of time date contraints
 
 //Call Shopify API and send the results to Klavio using API fetch
- function callAPIs(OrderURL){
+ function apiFunctionCall(OrderURL){
     fetch(OrderURL)
         .then(checkResponseStatus)
         .then(res => res.json())
@@ -47,12 +42,13 @@ callAPIs(urlForAllOrders); //call api for all orders irrespective of time date c
                         "$value": data.orders[i].total_price,
                         },
                     "time" : Math.round((new Date()).getTime() / 1000)
-            }
-
+                    }
             // send your payload to Klaviyo and receive a promise to sync further calls
-            let returnPromise = sendDataToKlaviyo(placedOrderMetrics);
-            returnPromise.then(console.log("Placed order First"));
-                // continue with ordered products to build second payload for line_items
+            let placedOrderResponse = sendDataToKlaviyo(placedOrderMetrics);    
+            placedOrderResponse.then(function(){
+                console.log("Placed Order API call to Klaviyo")
+                
+                // continue with ordered products to build second payload for line_items for order products
                 for(let j = 0; j < data.orders[i].line_items.length; j++){
                   let orderProductMetrics = {
                     "token": pubApiKey,
@@ -74,34 +70,40 @@ callAPIs(urlForAllOrders); //call api for all orders irrespective of time date c
                     "time": Math.round((new Date()).getTime() / 1000)         
                 };
                 // send data to Klaviyo with the order Product metrics
-                sendDataToKlaviyo(orderProductMetrics);
-                console.log("Ordered Product sent");
-                }
+               // sendDataToKlaviyo(orderProductMetrics);
             
+               let orderProductResponse = sendDataToKlaviyo(orderProductMetrics);
+               orderProductResponse.then(function(){
+                   console.log(" -------------  ");
+                  console.log("Ordered Product API call to Klaviyo")
+                });
+               }
+             });
             }
-            console.log("Objects we created based on the results:");
-        
         })
         .catch(err => console.log(err));
 }
-//encode the data in base64 and send it over to Klaviyo 
-let sendDataToKlaviyo =  function(data){
+// encode the data in base64 and send it over to Klaviyo 
+let sendDataToKlaviyo = function(data){
         const encodedData = Buffer.from(JSON.stringify(data), 'binary').toString('base64');
-        const url = "https://a.klaviyo.com/api/track?api_key=pk_85d0a1bb1bca774e057f32c4222c4bfc2f&data="+encodedData
+        const priKey = "pk_85d0a1bb1bca774e057f32c4222c4bfc2f"
+        const url = "https://a.klaviyo.com/api/track?api_key="+priKey+"&data="+encodedData
         
         return fetch(url)
             .then(checkResponseStatus)
             .then(res => res.json())
             .then(data => {
-                console.log(data);
+                console.log("Success OK :- "+ data);
             })
-            .catch(err => console.log(err));
+            .catch(err => console.log("Error :- "+ err));
     }
 // check response status and send back graceful message
 function checkResponseStatus(res) {
     if(res.ok){
         return res
+        console.log("OK 200 ");
     } else {
         throw new Error(`The HTTP status of the response: ${res.status} (${res.statusText})`);
     }
 }
+
