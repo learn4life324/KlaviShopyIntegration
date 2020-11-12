@@ -1,4 +1,4 @@
-In this application, NodeJS is used as medium to interact with Shopify API to reterieve data and submit over to Klaviyo.
+This NodeJS app interact with Shopify API to reterieve Orders and Placed orders data and submit over to Klaviyo application.
 
 Shopify API end point : https://success-engineering.myshopify.com//admin/api/2020-10/orders.json?status=any
 Klaviyo endpoint: https://a.klaviyo.com/api/track?api_key=pk_85d0a1bb1bca774e057f32c4222c4bfc2f&data=<base64 encoded data>
